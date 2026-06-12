@@ -1,0 +1,12 @@
+ValidationError:
+  type: object
+  properties:
+    code:
+      type: integer
+      example: 422
+    message:
+      type: string
+      example: "Validation Error"
+  required:
+    - code
+    - message

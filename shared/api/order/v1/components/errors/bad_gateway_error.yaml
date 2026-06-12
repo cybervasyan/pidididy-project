@@ -1,0 +1,12 @@
+BadGatewayError:
+  type: object
+  properties:
+    code:
+      type: integer
+      example: 502
+    message:
+      type: string
+      example: "Bad Gateway"
+  required:
+    - code
+    - message

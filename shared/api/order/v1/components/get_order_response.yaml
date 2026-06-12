@@ -1,0 +1,2 @@
+GetOrderResponse:
+  $ref: './order_dto.yaml#/OrderDto'

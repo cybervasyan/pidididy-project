@@ -1,0 +1,12 @@
+ServiceUnavailableError:
+  type: object
+  properties:
+    code:
+      type: integer
+      example: 503
+    message:
+      type: string
+      example: "Service Unavailable"
+  required:
+    - code
+    - message

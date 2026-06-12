@@ -1,0 +1,12 @@
+ConflictError:
+  type: object
+  properties:
+    code:
+      type: integer
+      example: 409
+    message:
+      type: string
+      example: "Conflict"
+  required:
+    - code
+    - message

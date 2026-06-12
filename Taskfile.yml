@@ -1,0 +1,151 @@
+version: '3'
+
+vars:
+  GO_VERSION: '1.24'
+  GOLANGCI_LINT_VERSION: 'v2.1.5'
+  GCI_VERSION: 'v0.13.6'
+  GOFUMPT_VERSION: 'v0.8.0'
+  BUF_VERSION: '1.53.0'
+  PROTOC_GEN_GO_VERSION: 'v1.36.6'
+  PROTOC_GEN_GO_GRPC_VERSION: 'v1.5.1'
+  OGEN_VERSION: 'v1.12.0'
+  YQ_VERSION: 'v4.45.2'
+  GRPCURL_VERSION: 'v1.9.3'
+
+  BIN_DIR: '{{.ROOT_DIR}}/bin'
+  GOLANGCI_LINT: '{{.BIN_DIR}}/golangci-lint.exe'
+  GCI: '{{.BIN_DIR}}/gci.exe'
+  GOFUMPT: '{{.BIN_DIR}}/gofumpt.exe'
+  BUF: '{{.BIN_DIR}}/buf.exe'
+  OGEN: '{{.BIN_DIR}}/ogen.exe'
+  YQ: '{{.BIN_DIR}}/yq.exe'
+  PROTOC_GEN_GO: '{{.BIN_DIR}}/protoc-gen-go.exe'
+  PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc.exe'
+  GRPCURL: '{{.BIN_DIR}}/grpcurl.exe'
+
+  NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
+  REDOCLY: '{{.NODE_MODULES_DIR}}/redocly'
+
+  OPEN_API_ORDER_V1_BASE: '{{.ROOT_DIR}}/shared/api/order/v1/order.openapi.yaml'
+  OPEN_API_ORDER_V1_BUNDLE: '{{.ROOT_DIR}}/shared/api/bundles/order.openapi.v1.bundle.yaml'
+  OPEN_API_FILES: '{{.ROOT_DIR}}/shared/api/bundles'
+
+  MODULES: assembly inventory order payment platform iam notification
+  GCI_PREFIX: github.com/olezhek28/microservices-course-olezhek-solution
+
+tasks:
+  install-formatters:
+    desc: "Устанавливает форматтеры gci и gofumpt в ./bin"
+    cmds:
+      - powershell -NoProfile -NonInteractive -File scripts/install-formatters.ps1 -BinDir "{{.BIN_DIR}}" -GofumptPath "{{.GOFUMPT}}" -GciPath "{{.GCI}}" -GofumptVersion "{{.GOFUMPT_VERSION}}" -GciVersion "{{.GCI_VERSION}}"
+    status:
+      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.GOFUMPT}}') { exit 0 } else { exit 1 }"
+      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.GCI}}') { exit 0 } else { exit 1 }"
+
+  format:
+    desc: "Форматирует весь проект gofumpt + gci, исключая mocks"
+    deps: [ install-formatters ]
+    cmds:
+      - powershell -NoProfile -NonInteractive -File scripts/format.ps1 -Modules "{{.MODULES}}" -GofumptPath "{{.GOFUMPT}}" -GciPath "{{.GCI}}" -Prefix "{{.GCI_PREFIX}}"
+
+  install-golangci-lint:
+    desc: "Устанавливает golangci-lint в каталог bin"
+    cmds:
+      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.GOLANGCI_LINT}}" -Package "github.com/golangci/golangci-lint/v2/cmd/golangci-lint" -Version "{{.GOLANGCI_LINT_VERSION}}"
+    status:
+      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.GOLANGCI_LINT}}') { exit 0 } else { exit 1 }"
+
+  lint:
+    desc: "Запускает golangci-lint для всех модулей"
+    deps: [ install-golangci-lint ]
+    cmds:
+      - powershell -NoProfile -NonInteractive -File scripts/lint.ps1 -Modules "{{.MODULES}}" -LintPath "{{.GOLANGCI_LINT}}"
+
+  install-buf:
+    desc: "Устанавливает Buf в каталог bin"
+    cmds:
+      - powershell -NoProfile -NonInteractive -Command "if (-not (Test-Path '{{.BUF}}')) { New-Item -ItemType Directory -Force -Path '{{.BIN_DIR}}' | Out-Null; Invoke-WebRequest -Uri 'https://github.com/bufbuild/buf/releases/download/v{{.BUF_VERSION}}/buf-Windows-x86_64.exe' -OutFile '{{.BUF}}' }"
+    status:
+      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.BUF}}') { exit 0 } else { exit 1 }"
+
+  proto:install-plugins:
+    desc: "Устанавливает protoc плагины в каталог bin"
+    cmds:
+      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.PROTOC_GEN_GO}}" -Package "google.golang.org/protobuf/cmd/protoc-gen-go" -Version "{{.PROTOC_GEN_GO_VERSION}}"
+      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.PROTOC_GEN_GO_GRPC}}" -Package "google.golang.org/grpc/cmd/protoc-gen-go-grpc" -Version "{{.PROTOC_GEN_GO_GRPC_VERSION}}"
+
+  proto:gen:
+    deps: [ install-buf, proto:install-plugins, proto:lint ]
+    desc: Генерация Go-кода из .proto
+    dir: shared/proto
+    cmds:
+      - '{{.BUF}} generate'
+
+  proto:lint:
+    deps: [ install-buf, proto:install-plugins ]
+    desc: Проверка .proto-файлов на соответствие стилю
+    dir: shared/proto
+    cmds:
+      - '{{.BUF}} lint'
+
+  redocly-cli:install:
+    desc: Установить локально Redocly CLI
+    cmds:
+      - powershell -NoProfile -NonInteractive -Command "if (-not (Test-Path '{{.REDOCLY}}')) { npm ci }"
+
+  redocly-cli:order-v1-bundle:
+    desc: Собрать OpenAPI в один файл через локальный redocly
+    deps: [ redocly-cli:install ]
+    cmds:
+      - '{{.REDOCLY}} bundle {{.OPEN_API_ORDER_V1_BASE}} -o {{.OPEN_API_ORDER_V1_BUNDLE}}'
+
+  redocly-cli:bundle:
+    desc: Собрать все схемы OpenAPI в общие файлы через локальный redocly
+    deps: [ redocly-cli:install ]
+    cmds:
+      - task: redocly-cli:order-v1-bundle
+
+  ogen:install:
+    desc: "Скачивает ogen в папку bin"
+    cmds:
+      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.OGEN}}" -Package "github.com/ogen-go/ogen/cmd/ogen" -Version "{{.OGEN_VERSION}}"
+    status:
+      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.OGEN}}') { exit 0 } else { exit 1 }"
+
+  ogen:gen:
+    desc: "Генерация Go-кода из всех OpenAPI-деклараций с x-ogen"
+    deps: [ ogen:install, yq:install ]
+    cmds:
+      - task: redocly-cli:bundle
+      - powershell -NoProfile -NonInteractive -File scripts/ogen-gen.ps1 -OpenApiFiles "{{.OPEN_API_FILES}}" -YqPath "{{.YQ}}" -OgenPath "{{.OGEN}}"
+
+  gen:
+    desc: "Генерация всех proto и OpenAPI деклараций"
+    cmds:
+      - task: proto:gen
+      - task: ogen:gen
+
+  deps:update:
+    desc: "Обновление зависимостей в go.mod во всех модулях"
+    cmds:
+      - powershell -NoProfile -NonInteractive -File scripts/deps-update.ps1 -Modules "{{.MODULES}}"
+
+  yq:install:
+    desc: "Устанавливает yq в bin/ при необходимости"
+    cmds:
+      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.YQ}}" -Package "github.com/mikefarah/yq/v4" -Version "{{.YQ_VERSION}}"
+    status:
+      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.YQ}}') { exit 0 } else { exit 1 }"
+
+  grpcurl:install:
+    desc: "Устанавливает grpcurl в каталог bin"
+    cmds:
+      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.GRPCURL}}" -Package "github.com/fullstorydev/grpcurl/cmd/grpcurl" -Version "{{.GRPCURL_VERSION}}"
+    status:
+      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.GRPCURL}}') { exit 0 } else { exit 1 }"
+
+  test-api:
+    desc: "🧪 Запуск тестов для проверки API микросервисов"
+    deps: [ grpcurl:install ]
+    cmds:
+      - powershell -NoProfile -NonInteractive -File scripts/test-api.ps1 -GrpcurlPath "{{.GRPCURL}}"

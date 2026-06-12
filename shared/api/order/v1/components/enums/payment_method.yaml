@@ -1,0 +1,15 @@
+PaymentMethod:
+  type: string
+  enum:
+    - UNKNOWN
+    - CARD
+    - SBP
+    - CREDIT_CARD
+    - INVESTOR_MONEY
+  description: |
+    Способ оплаты:
+    - UNKNOWN — неизвестный
+    - CARD — банковская карта
+    - SBP — система быстрых платежей
+    - CREDIT_CARD — кредитная карта
+    - INVESTOR_MONEY — деньги инвестора

@@ -1,0 +1,42 @@
+post:
+  summary: Создать заказ
+  operationId: createOrder
+  tags:
+    - orders
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/create_order_request.yaml#/CreateOrderRequest'
+  responses:
+    '200':
+      description: Заказ успешно создан
+      content:
+        application/json:
+          schema:
+            $ref: '../components/create_order_response.yaml#/CreateOrderResponse'
+    '400':
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '../components/errors/bad_request_error.yaml#/BadRequestError'
+    '404':
+      description: Деталь не найдена
+      content:
+        application/json:
+          schema:
+            $ref: '../components/errors/not_found_error.yaml#/NotFoundError'
+    '500':
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '../components/errors/internal_server_error.yaml#/InternalServerError'
+    default:
+      description: Неожиданная ошибка
+      content:
+        application/json:
+          schema:
+            $ref: '../components/errors/generic_error.yaml#/GenericError'

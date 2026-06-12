@@ -1,0 +1,44 @@
+post:
+  summary: Оплатить заказ
+  operationId: payOrder
+  tags:
+    - orders
+  parameters:
+    - $ref: '../params/order_uuid.yaml#/OrderUuidParam'
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/pay_order_request.yaml#/PayOrderRequest'
+  responses:
+    '200':
+      description: Оплата прошла успешно
+      content:
+        application/json:
+          schema:
+            $ref: '../components/pay_order_response.yaml#/PayOrderResponse'
+    '404':
+      description: Заказ не найден
+      content:
+        application/json:
+          schema:
+            $ref: '../components/errors/not_found_error.yaml#/NotFoundError'
+    '409':
+      description: Конфликт статуса заказа
+      content:
+        application/json:
+          schema:
+            $ref: '../components/errors/conflict_error.yaml#/ConflictError'
+    '500':
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '../components/errors/internal_server_error.yaml#/InternalServerError'
+    default:
+      description: Неожиданная ошибка
+      content:
+        application/json:
+          schema:
+            $ref: '../components/errors/generic_error.yaml#/GenericError'

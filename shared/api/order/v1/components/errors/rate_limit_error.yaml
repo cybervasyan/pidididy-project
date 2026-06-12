@@ -1,0 +1,12 @@
+RateLimitError:
+  type: object
+  properties:
+    code:
+      type: integer
+      example: 429
+    message:
+      type: string
+      example: "Too Many Requests"
+  required:
+    - code
+    - message
