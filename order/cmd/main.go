@@ -2,12 +2,22 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
+	customMiddleware "github.com/cybervasyan/pdididy-project/order/internal/middleware"
 	orderv1 "github.com/cybervasyan/pdididy-project/shared/pkg/openapi/order/v1"
 	"github.com/google/uuid"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 const (
@@ -24,6 +34,7 @@ type OrderStorage struct {
 }
 
 type OrderHandler struct {
+	orderv1.UnimplementedHandler
 	storage *OrderStorage
 }
 
@@ -39,13 +50,16 @@ func NewOrderHandler(storage *OrderStorage) *OrderHandler {
 	}
 }
 
-func (o *OrderStorage) GetOrderByUuid(ctx context.Context, params orderv1.GetOrderByUuidParams) (r orderv1.GetOrderByUuidRes, _ error) {
-	o.mu.RLock()
-	defer o.mu.RUnlock()
+func (o *OrderHandler) GetOrderByUuid(ctx context.Context, params orderv1.GetOrderByUuidParams) (r orderv1.GetOrderByUuidRes, _ error) {
+	o.storage.mu.RLock()
+	defer o.storage.mu.RUnlock()
 
-	order, ok := o.orders[params.OrderUUID]
+	order, ok := o.storage.orders[params.OrderUUID]
 	if !ok {
-		return &orderv1.NotFoundError{}, nil
+		return &orderv1.NotFoundError{
+			Code:    404,
+			Message: "Такого элемента нет",
+		}, nil
 	}
 
 	return order, nil
@@ -62,4 +76,41 @@ func main() {
 	}
 
 	r := chi.NewRouter()
+
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(10 * time.Second))
+	r.Use(customMiddleware.RequestLogger)
+
+	r.Mount("/", orderServer)
+
+	server := &http.Server{
+		Addr:              net.JoinHostPort("localhost", httpPort),
+		Handler:           r,
+		ReadHeaderTimeout: readHeaderTimeout,
+	}
+
+	go func() {
+		log.Printf("http-сервер запущен на порту %s\n", httpPort)
+		err = server.ListenAndServe()
+		if err != nil && errors.Is(err, http.ErrServerClosed) {
+			log.Printf("Ошибка запуска сервера: %v\n", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Printf("Завершение работы сервера...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	err = server.Shutdown(ctx)
+	if err != nil {
+		log.Printf("Ошибка при остановке сервера: %v\n", err)
+	}
+
+	log.Printf("Сервер остановлен")
 }

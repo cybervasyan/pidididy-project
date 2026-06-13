@@ -13,20 +13,24 @@ vars:
   GRPCURL_VERSION: 'v1.9.3'
 
   BIN_DIR: '{{.ROOT_DIR}}/bin'
-  GOLANGCI_LINT: '{{.BIN_DIR}}/golangci-lint.exe'
-  GCI: '{{.BIN_DIR}}/gci.exe'
-  GOFUMPT: '{{.BIN_DIR}}/gofumpt.exe'
-  BUF: '{{.BIN_DIR}}/buf.exe'
-  OGEN: '{{.BIN_DIR}}/ogen.exe'
-  YQ: '{{.BIN_DIR}}/yq.exe'
-  PROTOC_GEN_GO: '{{.BIN_DIR}}/protoc-gen-go.exe'
-  PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc.exe'
-  GRPCURL: '{{.BIN_DIR}}/grpcurl.exe'
+
+  # Бинари — с .exe на Windows, без на Linux/Mac
+  EXT:
+    sh: 'if [ "{{OS}}" = "windows" ]; then echo ".exe"; else echo ""; fi'
+  GOLANGCI_LINT: '{{.BIN_DIR}}/golangci-lint{{.EXT}}'
+  GCI:           '{{.BIN_DIR}}/gci{{.EXT}}'
+  GOFUMPT:       '{{.BIN_DIR}}/gofumpt{{.EXT}}'
+  BUF:           '{{.BIN_DIR}}/buf{{.EXT}}'
+  OGEN:          '{{.BIN_DIR}}/ogen{{.EXT}}'
+  YQ:            '{{.BIN_DIR}}/yq{{.EXT}}'
+  PROTOC_GEN_GO:      '{{.BIN_DIR}}/protoc-gen-go{{.EXT}}'
+  PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc{{.EXT}}'
+  GRPCURL:       '{{.BIN_DIR}}/grpcurl{{.EXT}}'
 
   NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
   REDOCLY: '{{.NODE_MODULES_DIR}}/redocly'
 
-  OPEN_API_ORDER_V1_BASE: '{{.ROOT_DIR}}/shared/api/order/v1/order.openapi.yaml'
+  OPEN_API_ORDER_V1_BASE:   '{{.ROOT_DIR}}/shared/api/order/v1/order.openapi.yaml'
   OPEN_API_ORDER_V1_BUNDLE: '{{.ROOT_DIR}}/shared/api/bundles/order.openapi.v1.bundle.yaml'
   OPEN_API_FILES: '{{.ROOT_DIR}}/shared/api/bundles'
 
@@ -34,45 +38,106 @@ vars:
   GCI_PREFIX: github.com/olezhek28/microservices-course-olezhek-solution
 
 tasks:
+  # ─── install-tool (универсальный) ──────────────────────────────────────────
+  _install-tool:
+    internal: true
+    cmds:
+      - platforms: [linux, darwin]
+        cmd: |
+          if [ ! -f "{{.TOOL_PATH}}" ]; then
+            echo "Installing {{.PACKAGE}}@{{.VERSION}}..."
+            mkdir -p "{{.BIN_DIR}}"
+            GOBIN="{{.BIN_DIR}}" go install "{{.PACKAGE}}@{{.VERSION}}"
+          fi
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.TOOL_PATH}}" -Package "{{.PACKAGE}}" -Version "{{.VERSION}}"
+
+  # ─── Formatters ────────────────────────────────────────────────────────────
   install-formatters:
     desc: "Устанавливает форматтеры gci и gofumpt в ./bin"
     cmds:
-      - powershell -NoProfile -NonInteractive -File scripts/install-formatters.ps1 -BinDir "{{.BIN_DIR}}" -GofumptPath "{{.GOFUMPT}}" -GciPath "{{.GCI}}" -GofumptVersion "{{.GOFUMPT_VERSION}}" -GciVersion "{{.GCI_VERSION}}"
-    status:
-      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.GOFUMPT}}') { exit 0 } else { exit 1 }"
-      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.GCI}}') { exit 0 } else { exit 1 }"
+      - task: _install-tool
+        vars: { TOOL_PATH: '{{.GOFUMPT}}', PACKAGE: mvdan.cc/gofumpt, VERSION: '{{.GOFUMPT_VERSION}}' }
+      - task: _install-tool
+        vars: { TOOL_PATH: '{{.GCI}}', PACKAGE: github.com/daixiang0/gci, VERSION: '{{.GCI_VERSION}}' }
 
   format:
     desc: "Форматирует весь проект gofumpt + gci, исключая mocks"
     deps: [ install-formatters ]
     cmds:
-      - powershell -NoProfile -NonInteractive -File scripts/format.ps1 -Modules "{{.MODULES}}" -GofumptPath "{{.GOFUMPT}}" -GciPath "{{.GCI}}" -Prefix "{{.GCI_PREFIX}}"
+      - platforms: [linux, darwin]
+        cmd: |
+          echo "Formatting with gofumpt..."
+          for module in {{.MODULES}}; do
+            if [ -d "$module" ]; then
+              echo "  -> $module"
+              find "$module" -type f -name '*.go' ! -path '*/mocks/*' -exec {{.GOFUMPT}} -extra -w {} +
+            fi
+          done
+          echo "Sorting imports with gci..."
+          for module in {{.MODULES}}; do
+            if [ -d "$module" ]; then
+              echo "  -> $module"
+              find "$module" -type f -name '*.go' ! -path '*/mocks/*' -exec {{.GCI}} write -s standard -s default -s "prefix({{.GCI_PREFIX}})" {} +
+            fi
+          done
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -File scripts/format.ps1 -Modules "{{.MODULES}}" -GofumptPath "{{.GOFUMPT}}" -GciPath "{{.GCI}}" -Prefix "{{.GCI_PREFIX}}"
 
+  # ─── Lint ──────────────────────────────────────────────────────────────────
   install-golangci-lint:
     desc: "Устанавливает golangci-lint в каталог bin"
     cmds:
-      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.GOLANGCI_LINT}}" -Package "github.com/golangci/golangci-lint/v2/cmd/golangci-lint" -Version "{{.GOLANGCI_LINT_VERSION}}"
-    status:
-      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.GOLANGCI_LINT}}') { exit 0 } else { exit 1 }"
+      - task: _install-tool
+        vars: { TOOL_PATH: '{{.GOLANGCI_LINT}}', PACKAGE: github.com/golangci/golangci-lint/v2/cmd/golangci-lint, VERSION: '{{.GOLANGCI_LINT_VERSION}}' }
 
   lint:
     desc: "Запускает golangci-lint для всех модулей"
     deps: [ install-golangci-lint ]
     cmds:
-      - powershell -NoProfile -NonInteractive -File scripts/lint.ps1 -Modules "{{.MODULES}}" -LintPath "{{.GOLANGCI_LINT}}"
+      - platforms: [linux, darwin]
+        cmd: |
+          set -e
+          ERR=0
+          echo "Linting all modules..."
+          for mod in {{.MODULES}}; do
+            if [ -d "$mod" ]; then
+              echo "  -> $mod"
+              {{.GOLANGCI_LINT}} run "$mod/..." --config=.golangci.yml || ERR=1
+            fi
+          done
+          exit $ERR
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -File scripts/lint.ps1 -Modules "{{.MODULES}}" -LintPath "{{.GOLANGCI_LINT}}"
 
+  # ─── Buf ───────────────────────────────────────────────────────────────────
   install-buf:
     desc: "Устанавливает Buf в каталог bin"
     cmds:
-      - powershell -NoProfile -NonInteractive -Command "if (-not (Test-Path '{{.BUF}}')) { New-Item -ItemType Directory -Force -Path '{{.BIN_DIR}}' | Out-Null; Invoke-WebRequest -Uri 'https://github.com/bufbuild/buf/releases/download/v{{.BUF_VERSION}}/buf-Windows-x86_64.exe' -OutFile '{{.BUF}}' }"
-    status:
-      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.BUF}}') { exit 0 } else { exit 1 }"
+      - platforms: [linux]
+        cmd: |
+          if [ ! -f "{{.BUF}}" ]; then
+            mkdir -p "{{.BIN_DIR}}"
+            curl -sSL "https://github.com/bufbuild/buf/releases/download/v{{.BUF_VERSION}}/buf-Linux-x86_64" -o "{{.BUF}}"
+            chmod +x "{{.BUF}}"
+          fi
+      - platforms: [darwin]
+        cmd: |
+          if [ ! -f "{{.BUF}}" ]; then
+            mkdir -p "{{.BIN_DIR}}"
+            curl -sSL "https://github.com/bufbuild/buf/releases/download/v{{.BUF_VERSION}}/buf-Darwin-x86_64" -o "{{.BUF}}"
+            chmod +x "{{.BUF}}"
+          fi
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -Command "if (-not (Test-Path '{{.BUF}}')) { New-Item -ItemType Directory -Force -Path '{{.BIN_DIR}}' | Out-Null; Invoke-WebRequest -Uri 'https://github.com/bufbuild/buf/releases/download/v{{.BUF_VERSION}}/buf-Windows-x86_64.exe' -OutFile '{{.BUF}}' }"
 
   proto:install-plugins:
     desc: "Устанавливает protoc плагины в каталог bin"
     cmds:
-      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.PROTOC_GEN_GO}}" -Package "google.golang.org/protobuf/cmd/protoc-gen-go" -Version "{{.PROTOC_GEN_GO_VERSION}}"
-      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.PROTOC_GEN_GO_GRPC}}" -Package "google.golang.org/grpc/cmd/protoc-gen-go-grpc" -Version "{{.PROTOC_GEN_GO_GRPC_VERSION}}"
+      - task: _install-tool
+        vars: { TOOL_PATH: '{{.PROTOC_GEN_GO}}', PACKAGE: google.golang.org/protobuf/cmd/protoc-gen-go, VERSION: '{{.PROTOC_GEN_GO_VERSION}}' }
+      - task: _install-tool
+        vars: { TOOL_PATH: '{{.PROTOC_GEN_GO_GRPC}}', PACKAGE: google.golang.org/grpc/cmd/protoc-gen-go-grpc, VERSION: '{{.PROTOC_GEN_GO_GRPC_VERSION}}' }
 
   proto:gen:
     deps: [ install-buf, proto:install-plugins, proto:lint ]
@@ -88,36 +153,57 @@ tasks:
     cmds:
       - '{{.BUF}} lint'
 
+  # ─── Redocly ───────────────────────────────────────────────────────────────
   redocly-cli:install:
     desc: Установить локально Redocly CLI
     cmds:
-      - powershell -NoProfile -NonInteractive -Command "if (-not (Test-Path '{{.REDOCLY}}')) { npm ci }"
+      - platforms: [linux, darwin]
+        cmd: '[ -f "{{.REDOCLY}}" ] || npm ci'
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -Command "if (-not (Test-Path '{{.REDOCLY}}')) { npm ci }"
 
   redocly-cli:order-v1-bundle:
-    desc: Собрать OpenAPI в один файл через локальный redocly
+    desc: Собрать OpenAPI order v1 в бандл
     deps: [ redocly-cli:install ]
     cmds:
       - '{{.REDOCLY}} bundle {{.OPEN_API_ORDER_V1_BASE}} -o {{.OPEN_API_ORDER_V1_BUNDLE}}'
 
   redocly-cli:bundle:
-    desc: Собрать все схемы OpenAPI в общие файлы через локальный redocly
+    desc: Собрать все схемы OpenAPI
     deps: [ redocly-cli:install ]
     cmds:
       - task: redocly-cli:order-v1-bundle
 
+  # ─── ogen ──────────────────────────────────────────────────────────────────
   ogen:install:
     desc: "Скачивает ogen в папку bin"
     cmds:
-      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.OGEN}}" -Package "github.com/ogen-go/ogen/cmd/ogen" -Version "{{.OGEN_VERSION}}"
-    status:
-      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.OGEN}}') { exit 0 } else { exit 1 }"
+      - task: _install-tool
+        vars: { TOOL_PATH: '{{.OGEN}}', PACKAGE: github.com/ogen-go/ogen/cmd/ogen, VERSION: '{{.OGEN_VERSION}}' }
+
+  yq:install:
+    desc: "Устанавливает yq в bin/"
+    cmds:
+      - task: _install-tool
+        vars: { TOOL_PATH: '{{.YQ}}', PACKAGE: github.com/mikefarah/yq/v4, VERSION: '{{.YQ_VERSION}}' }
 
   ogen:gen:
     desc: "Генерация Go-кода из всех OpenAPI-деклараций с x-ogen"
     deps: [ ogen:install, yq:install ]
     cmds:
       - task: redocly-cli:bundle
-      - powershell -NoProfile -NonInteractive -File scripts/ogen-gen.ps1 -OpenApiFiles "{{.OPEN_API_FILES}}" -YqPath "{{.YQ}}" -OgenPath "{{.OGEN}}"
+      - platforms: [linux, darwin]
+        cmd: |
+          find {{.OPEN_API_FILES}} -name '*.yaml' -o -name '*.yml' | while read -r file; do
+            if grep -q 'x-ogen:' "$file"; then
+              echo "Generating from: $file"
+              target=$({{.YQ}} e '."x-ogen".target' "$file")
+              package=$({{.YQ}} e '."x-ogen".package' "$file")
+              {{.OGEN}} --target "$target" --package "$package" --clean "$file" || exit 1
+            fi
+          done
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -File scripts/ogen-gen.ps1 -OpenApiFiles "{{.OPEN_API_FILES}}" -YqPath "{{.YQ}}" -OgenPath "{{.OGEN}}"
 
   gen:
     desc: "Генерация всех proto и OpenAPI деклараций"
@@ -125,27 +211,33 @@ tasks:
       - task: proto:gen
       - task: ogen:gen
 
+  # ─── deps ──────────────────────────────────────────────────────────────────
   deps:update:
     desc: "Обновление зависимостей в go.mod во всех модулях"
     cmds:
-      - powershell -NoProfile -NonInteractive -File scripts/deps-update.ps1 -Modules "{{.MODULES}}"
+      - platforms: [linux, darwin]
+        cmd: |
+          for mod in {{.MODULES}}; do
+            if [ -d "$mod" ]; then
+              echo "  -> $mod"
+              (cd "$mod" && go mod tidy) || exit 1
+            fi
+          done
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -File scripts/deps-update.ps1 -Modules "{{.MODULES}}"
 
-  yq:install:
-    desc: "Устанавливает yq в bin/ при необходимости"
-    cmds:
-      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.YQ}}" -Package "github.com/mikefarah/yq/v4" -Version "{{.YQ_VERSION}}"
-    status:
-      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.YQ}}') { exit 0 } else { exit 1 }"
-
+  # ─── grpcurl / test-api ────────────────────────────────────────────────────
   grpcurl:install:
     desc: "Устанавливает grpcurl в каталог bin"
     cmds:
-      - powershell -NoProfile -NonInteractive -File scripts/install-tool.ps1 -BinDir "{{.BIN_DIR}}" -ToolPath "{{.GRPCURL}}" -Package "github.com/fullstorydev/grpcurl/cmd/grpcurl" -Version "{{.GRPCURL_VERSION}}"
-    status:
-      - powershell -NoProfile -NonInteractive -Command "if (Test-Path '{{.GRPCURL}}') { exit 0 } else { exit 1 }"
+      - task: _install-tool
+        vars: { TOOL_PATH: '{{.GRPCURL}}', PACKAGE: github.com/fullstorydev/grpcurl/cmd/grpcurl, VERSION: '{{.GRPCURL_VERSION}}' }
 
   test-api:
-    desc: "🧪 Запуск тестов для проверки API микросервисов"
+    desc: "Запуск тестов для проверки API микросервисов"
     deps: [ grpcurl:install ]
     cmds:
-      - powershell -NoProfile -NonInteractive -File scripts/test-api.ps1 -GrpcurlPath "{{.GRPCURL}}"
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -File scripts/test-api.ps1 -GrpcurlPath "{{.GRPCURL}}"
+      - platforms: [linux, darwin]
+        cmd: scripts/test-api.sh "{{.GRPCURL}}"
