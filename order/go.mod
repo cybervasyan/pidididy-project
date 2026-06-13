@@ -1,6 +1,6 @@
 module github.com/cybervasyan/pdididy-project/order
 
-go 1.25.0
+go 1.24.0
 
 require github.com/google/uuid v1.6.0
 
@@ -10,7 +10,7 @@ require (
 )
 
 require (
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirectGet-ChildItem -Recurse -Filter "go.mod" | ForEach-Object { Get-Content $_.FullName | Select-String "^go " }
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
