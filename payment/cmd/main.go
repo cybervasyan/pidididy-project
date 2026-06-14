@@ -26,7 +26,7 @@ func (p *paymentService) PayOrder(context.Context, *paymentv1.PayOrderRequest) (
 }
 
 func main() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 50051))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 50052))
 	if err != nil {
 		log.Printf("failed to listen: %v\n", err)
 		return
@@ -49,7 +49,7 @@ func main() {
 	reflection.Register(s)
 
 	go func() {
-		log.Printf("gRPC server listening on %d\n", 50051)
+		log.Printf("PaymentService gRPC server listening on %d\n", 50052)
 		err = s.Serve(lis)
 		if err != nil {
 			log.Printf("failed to serve: %v\n", err)

@@ -28,8 +28,8 @@ const (
 	// Таймауты для http-сервера
 	readHeaderTimeout      = 5 * time.Second
 	shutdownTimeout        = 10 * time.Second
-	paymentServerAddress   = "localhost:50051"
-	inventoryServerAddress = "localhost:50052"
+	paymentServerAddress   = "localhost:50052"
+	inventoryServerAddress = "localhost:50051"
 )
 
 type OrderStorage struct {
@@ -142,8 +142,9 @@ func (o *OrderHandler) PayOrder(ctx context.Context, req *orderv1.PayOrderReques
 	}
 
 	o.storage.mu.Unlock()
-
-	parts, err := o.inventoryClient.ListParts(ctx, &inventoryv1.ListPartsRequest{Filter: &inventoryv1.PartsFilter{Uuids: partsStringUUIDs}})
+	grpcCtx, grpcCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer grpcCancel()
+	parts, err := o.inventoryClient.ListParts(grpcCtx, &inventoryv1.ListPartsRequest{Filter: &inventoryv1.PartsFilter{Uuids: partsStringUUIDs}})
 
 	if err != nil {
 		return &orderv1.InternalServerError{
@@ -175,7 +176,7 @@ func (o *OrderHandler) PayOrder(ctx context.Context, req *orderv1.PayOrderReques
 		paymentMethod = paymentv1.PaymentMethod_PAYMENT_METHOD_UNSPECIFIED
 	}
 
-	transactionUUID, err := o.paymentClient.PayOrder(ctx, &paymentv1.PayOrderRequest{
+	transactionUUID, err := o.paymentClient.PayOrder(grpcCtx, &paymentv1.PayOrderRequest{
 		OrderUuid:     params.OrderUUID.String(),
 		UserUuid:      order.UserUUID.String(),
 		PaymentMethod: paymentMethod,

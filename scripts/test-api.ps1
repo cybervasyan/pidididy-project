@@ -4,125 +4,104 @@
 
 $ErrorActionPreference = 'Stop'
 
-Write-Host 'Тестирование API микросервисов через gRPC и REST'
+function Grpc {
+    param([string]$Method, [string]$Data)
+    $result = cmd /c "echo $Data | `"$GrpcurlPath`" -plaintext -d @ localhost:50051 $Method" 2>&1
+    return $result | Out-String
+}
 
-# Тест 1
-Write-Host ''
-Write-Host 'Тест 1: Получение списка деталей из Inventory'
-$partsResponse = & $GrpcurlPath -plaintext -d '{"filter":{}}' localhost:50051 inventory.v1.InventoryService/ListParts 2>&1 | Out-String
-if ([string]::IsNullOrWhiteSpace($partsResponse) -or $partsResponse -match '"error"') {
-    Write-Host 'Не удалось получить список деталей.'
-    Write-Host "Ответ сервера: $partsResponse"
-    exit 1
+Write-Host 'Test 1: ListParts'
+$partsResponse = Grpc 'inventory.v1.InventoryService/ListParts' '{"filter":{}}'
+if ([string]::IsNullOrWhiteSpace($partsResponse) -or $partsResponse -match 'Error invoking') {
+    Write-Host "FAIL: $partsResponse"; exit 1
 }
 $partUuid = ([regex]'"uuid":\s*"([^"]+)"').Match($partsResponse).Groups[1].Value
 if ([string]::IsNullOrEmpty($partUuid)) {
-    Write-Host 'Не удалось найти UUID детали.'
-    Write-Host "Ответ: $partsResponse"
-    exit 1
+    Write-Host "FAIL: no part UUID. Response: $partsResponse"; exit 1
 }
-Write-Host "Список деталей получен. Первая UUID: $partUuid"
+Write-Host "OK: part UUID=$partUuid"
 
-# Тест 2
-Write-Host ''
-Write-Host 'Тест 2: Получение информации о детали по UUID'
-$partResponse = & $GrpcurlPath -plaintext -d "{`"uuid`":`"$partUuid`"}" localhost:50051 inventory.v1.InventoryService/GetPart 2>&1 | Out-String
-if ([string]::IsNullOrWhiteSpace($partResponse) -or $partResponse -match '"error"') {
-    Write-Host 'Не удалось получить информацию о детали.'
-    Write-Host "Ответ: $partResponse"
-    exit 1
+Write-Host 'Test 2: GetPart'
+$getPartData = '{"uuid":"' + $partUuid + '"}'
+$partResponse = Grpc 'inventory.v1.InventoryService/GetPart' $getPartData
+if ([string]::IsNullOrWhiteSpace($partResponse) -or $partResponse -match 'Error invoking') {
+    Write-Host "FAIL: $partResponse"; exit 1
 }
 $partName = ([regex]'"name":\s*"([^"]+)"').Match($partResponse).Groups[1].Value
 if ([string]::IsNullOrEmpty($partName)) {
-    Write-Host 'Не удалось извлечь имя детали.'
-    exit 1
+    Write-Host "FAIL: no part name. Response: $partResponse"; exit 1
 }
-Write-Host "Деталь получена: $partName"
+Write-Host "OK: part name=$partName"
 
-# Тест 3
-Write-Host ''
-Write-Host 'Тест 3: Генерация UUID пользователя'
+Write-Host 'Test 3: Generate user UUID'
 $userUuid = [System.Guid]::NewGuid().ToString().ToLower()
-Write-Host "UUID пользователя: $userUuid"
+Write-Host "OK: user UUID=$userUuid"
 
-# Тест 4
-Write-Host ''
-Write-Host 'Тест 4: Создание заказа (REST API)'
-$orderBody = "{`"user_uuid`":`"$userUuid`",`"part_uuids`":[`"$partUuid`"]}"
+Write-Host 'Test 4: CreateOrder'
+$orderBody = '{"user_uuid":"' + $userUuid + '","part_uuids":["' + $partUuid + '"]}'
 try {
     $orderObj = Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/v1/orders' -ContentType 'application/json' -Body $orderBody
 } catch {
-    Write-Host "Не удалось создать заказ: $_"; exit 1
+    Write-Host "FAIL: $_"; exit 1
 }
-$orderUuid = $orderObj.uuid
+$orderUuid = $orderObj.order_uuid
+if ([string]::IsNullOrEmpty($orderUuid)) { $orderUuid = $orderObj.uuid }
 if ([string]::IsNullOrEmpty($orderUuid)) {
-    Write-Host 'Не удалось извлечь UUID заказа.'; exit 1
+    Write-Host "FAIL: no order UUID. Response: $($orderObj | ConvertTo-Json)"; exit 1
 }
-Write-Host "Заказ создан. UUID: $orderUuid"
+Write-Host "OK: order UUID=$orderUuid"
 
-# Тест 5
-Write-Host ''
-Write-Host 'Тест 5: Проверка начального статуса (ожидается PENDING_PAYMENT)'
+Write-Host 'Test 5: Check PENDING_PAYMENT'
 $orderInfo = Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/orders/$orderUuid"
 if ($orderInfo.status -notmatch 'PENDING_PAYMENT') {
-    Write-Host "Ожидался PENDING_PAYMENT, получен: $($orderInfo.status)"; exit 1
+    Write-Host "FAIL: expected PENDING_PAYMENT, got $($orderInfo.status)"; exit 1
 }
-Write-Host "Статус корректный: $($orderInfo.status)"
+Write-Host "OK: status=$($orderInfo.status)"
 
-# Тест 6
-Write-Host ''
-Write-Host 'Тест 6: Оплата заказа'
+Write-Host 'Test 6: PayOrder'
 try {
     Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/v1/orders/$orderUuid/pay" `
-        -ContentType 'application/json' -Body '{"payment_method":"PAYMENT_METHOD_CARD"}' | Out-Null
+        -ContentType 'application/json' -Body '{"payment_method":"CARD"}' | Out-Null
 } catch {
-    Write-Host "Ошибка при оплате: $_"; exit 1
+    Write-Host "FAIL: $_"; exit 1
 }
-Write-Host 'Заказ оплачен'
+Write-Host 'OK: paid'
 
-# Тест 7
-Write-Host ''
-Write-Host 'Тест 7: Проверка статуса после оплаты (ожидается PAID или ASSEMBLED)'
+Write-Host 'Test 7: Check PAID'
 $orderInfo = Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/orders/$orderUuid"
 if ($orderInfo.status -notmatch 'PAID' -and $orderInfo.status -notmatch 'ASSEMBLED') {
-    Write-Host "Ожидался PAID/ASSEMBLED, получен: $($orderInfo.status)"; exit 1
+    Write-Host "FAIL: expected PAID/ASSEMBLED, got $($orderInfo.status)"; exit 1
 }
-Write-Host "Статус после оплаты: $($orderInfo.status)"
+Write-Host "OK: status=$($orderInfo.status)"
 
-# Тест 8
-Write-Host ''
-Write-Host 'Тест 8: Создание второго заказа для отмены'
+Write-Host 'Test 8: Create second order'
 try {
     $order2Obj = Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/v1/orders' -ContentType 'application/json' -Body $orderBody
 } catch {
-    Write-Host "Не удалось создать второй заказ: $_"; exit 1
+    Write-Host "FAIL: $_"; exit 1
 }
-$order2Uuid = $order2Obj.uuid
+$order2Uuid = $order2Obj.order_uuid
+if ([string]::IsNullOrEmpty($order2Uuid)) { $order2Uuid = $order2Obj.uuid }
 if ([string]::IsNullOrEmpty($order2Uuid)) {
-    Write-Host 'Не удалось извлечь UUID второго заказа.'; exit 1
+    Write-Host "FAIL: no order2 UUID"; exit 1
 }
-Write-Host "Второй заказ создан. UUID: $order2Uuid"
+Write-Host "OK: order2 UUID=$order2Uuid"
 
 $order2Info = Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/orders/$order2Uuid"
 if ($order2Info.status -notmatch 'PENDING_PAYMENT') {
-    Write-Host "Ожидался PENDING_PAYMENT, получен: $($order2Info.status)"; exit 1
+    Write-Host "FAIL: expected PENDING_PAYMENT, got $($order2Info.status)"; exit 1
 }
-Write-Host "Начальный статус второго заказа: $($order2Info.status)"
+Write-Host "OK: status=$($order2Info.status)"
 
-# Тест 9
-Write-Host ''
-Write-Host 'Тест 9: Отмена второго заказа'
-Write-Host 'Ожидаем 2 секунды...'
+Write-Host 'Test 9: CancelOrder'
 Start-Sleep -Seconds 2
 Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/v1/orders/$order2Uuid/cancel" -ErrorAction SilentlyContinue | Out-Null
 
 $order2Info = Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/orders/$order2Uuid"
 if ($order2Info.status -notmatch 'CANCELLED') {
-    Write-Host "Ожидался CANCELLED, получен: $($order2Info.status)"
-    Write-Host "Детали: $($order2Info | ConvertTo-Json)"
-    exit 1
+    Write-Host "FAIL: expected CANCELLED, got $($order2Info.status)"; exit 1
 }
-Write-Host "Статус после отмены: $($order2Info.status)"
+Write-Host "OK: status=$($order2Info.status)"
 
 Write-Host ''
-Write-Host 'Все тесты API успешно выполнены!'
+Write-Host 'All tests passed!'
