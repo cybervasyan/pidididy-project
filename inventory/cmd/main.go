@@ -38,9 +38,7 @@ func (s *inventoryService) ListParts(_ context.Context, req *inventoryv1.ListPar
 	filters := req.GetFilter()
 	var parts []*inventoryv1.Part
 
-	for _, v := range s.parts {
-		parts = append(parts, v)
-	}
+	parts = append(parts, s.parts...)
 
 	if filters == nil {
 		return &inventoryv1.ListPartsResponse{
