@@ -12,7 +12,7 @@ func (r *repository) Update(ctx context.Context, req *model.Order) (model.Order,
 
 	_, ok := r.orders[req.OrderUUID]
 	if !ok {
-		return model.Order{}, model.ErrorOrderDoesntExist
+		return model.Order{}, model.ErrOrderDoesntExist
 	}
 
 	r.orders[req.OrderUUID] = req

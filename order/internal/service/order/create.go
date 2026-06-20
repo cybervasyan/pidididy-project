@@ -27,7 +27,7 @@ func (s *service) CreateOrder(ctx context.Context, req *model.Order) (model.Orde
 
 	for _, id := range req.PartUuids {
 		if _, ok := foundParts[id.String()]; !ok {
-			return model.Order{}, model.ErrorPartNotFound
+			return model.Order{}, model.ErrPartNotFound
 		}
 	}
 	var totalPrice float64

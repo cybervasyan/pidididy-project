@@ -13,7 +13,7 @@ func (r *repository) Cancel(_ context.Context, orderUUID uuid.UUID) error {
 
 	order, ok := r.orders[orderUUID]
 	if !ok {
-		return model.ErrorOrderDoesntExist
+		return model.ErrOrderDoesntExist
 	}
 
 	order.Status = model.OrderStatusCANCELLED

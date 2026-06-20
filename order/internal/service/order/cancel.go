@@ -15,7 +15,7 @@ func (s *service) CancelOrder(ctx context.Context, orderUUID uuid.UUID) error {
 	}
 
 	if order.Status != model.OrderStatusPENDINGPAYMENT {
-		return baseModel.ErrorOrderNotInPending
+		return baseModel.ErrOrderNotInPending
 	}
 
 	err = s.orderRepo.Cancel(ctx, orderUUID)

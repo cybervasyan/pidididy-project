@@ -13,7 +13,7 @@ func (r *repository) Get(_ context.Context, orderUUID uuid.UUID) (model.Order, e
 
 	order, ok := r.orders[orderUUID]
 	if !ok {
-		return model.Order{}, model.ErrorOrderDoesntExist
+		return model.Order{}, model.ErrOrderDoesntExist
 	}
 
 	return *order, nil

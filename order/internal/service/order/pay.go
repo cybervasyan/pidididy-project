@@ -15,7 +15,7 @@ func (s *service) PayOrder(ctx context.Context, req *model.Order) (model.Order, 
 
 	orderModel := converter.ToServiceModel(order)
 	if orderModel.Status != model.OrderStatusPENDINGPAYMENT {
-		return model.Order{}, model.ErrorOrderNotInPending
+		return model.Order{}, model.ErrOrderNotInPending
 	}
 
 	orderModel.Status = model.OrderStatusPAID
