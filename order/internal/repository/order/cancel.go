@@ -16,10 +16,6 @@ func (r *repository) Cancel(_ context.Context, orderUUID uuid.UUID) error {
 		return model.ErrorOrderDoesntExist
 	}
 
-	if order.Status != model.OrderStatusPENDINGPAYMENT {
-		return model.ErrorOrderNotInPending
-	}
-
 	order.Status = model.OrderStatusCANCELLED
 
 	return nil
