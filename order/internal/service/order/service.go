@@ -8,11 +8,13 @@ import (
 type service struct {
 	orderRepo       repository.Repository
 	inventoryClient grpc.InventoryClient
+	paymentClient   grpc.PaymentClient
 }
 
-func NewOrderService(orderRepo repository.Repository, inventoryClient grpc.InventoryClient) *service {
+func NewOrderService(orderRepo repository.Repository, inventoryClient grpc.InventoryClient, paymentClient grpc.PaymentClient) *service {
 	return &service{
 		orderRepo:       orderRepo,
 		inventoryClient: inventoryClient,
+		paymentClient:   paymentClient,
 	}
 }
