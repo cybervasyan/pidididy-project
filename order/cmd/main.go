@@ -58,7 +58,7 @@ func NewOrderHandler(storage *OrderStorage, pay paymentv1.PaymentServiceClient, 
 	}
 }
 
-func (o *OrderHandler) GetOrderByUuid(ctx context.Context, params orderv1.GetOrderByUuidParams) (r orderv1.GetOrderByUuidRes, _ error) {
+func (o *OrderHandler) GetOrderByUuid(_ context.Context, params orderv1.GetOrderByUuidParams) (r orderv1.GetOrderByUuidRes, _ error) {
 	o.storage.mu.RLock()
 	defer o.storage.mu.RUnlock()
 
@@ -121,7 +121,7 @@ func (o *OrderHandler) CreateOrder(ctx context.Context, req *orderv1.CreateOrder
 	}, nil
 }
 
-func (o *OrderHandler) CancelOrder(ctx context.Context, params orderv1.CancelOrderParams) (r orderv1.CancelOrderRes, _ error) {
+func (o *OrderHandler) CancelOrder(_ context.Context, params orderv1.CancelOrderParams) (r orderv1.CancelOrderRes, _ error) {
 	o.storage.mu.Lock()
 	defer o.storage.mu.Unlock()
 

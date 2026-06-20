@@ -11,6 +11,7 @@ vars:
   OGEN_VERSION: 'v1.12.0'
   YQ_VERSION: 'v4.45.2'
   GRPCURL_VERSION: 'v1.9.3'
+  MOCKERY_VERSION: 'v2.53.3'
 
   BIN_DIR: '{{.ROOT_DIR}}/bin'
 
@@ -26,6 +27,7 @@ vars:
   PROTOC_GEN_GO:      '{{.BIN_DIR}}/protoc-gen-go{{.EXT}}'
   PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc{{.EXT}}'
   GRPCURL:       '{{.BIN_DIR}}/grpcurl{{.EXT}}'
+  MOCKERY:       '{{.BIN_DIR}}/mockery{{.EXT}}'
 
   NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
   REDOCLY: '{{.NODE_MODULES_DIR}}/redocly'
@@ -36,6 +38,8 @@ vars:
 
   MODULES: assembly inventory order payment platform iam notification
   GCI_PREFIX: github.com/olezhek28/microservices-course-olezhek-solution
+  COVERAGE_DIR: '{{.ROOT_DIR}}/coverage'
+  COVERAGE_FILE: total.out
 
 tasks:
   # ─── install-tool (универсальный) ──────────────────────────────────────────
@@ -241,3 +245,76 @@ tasks:
         cmd: powershell -NoProfile -NonInteractive -File scripts/test-api.ps1 -GrpcurlPath "{{.GRPCURL}}"
       - platforms: [linux, darwin]
         cmd: scripts/test-api.sh "{{.GRPCURL}}"
+
+  # ─── Mockery ───────────────────────────────────────────────────────────────
+  mockery:install:
+    desc: "Устанавливает mockery в ./bin"
+    cmds:
+      - task: _install-tool
+        vars: { TOOL_PATH: '{{.MOCKERY}}', PACKAGE: github.com/vektra/mockery/v2, VERSION: '{{.MOCKERY_VERSION}}' }
+
+  mockery:gen:
+    desc: "Генерирует моки интерфейсов через mockery"
+    deps: [ mockery:install ]
+    cmds:
+      - platforms: [linux, darwin]
+        cmd: '{{.MOCKERY}}'
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -Command "& '{{.MOCKERY}}'"
+
+  # ─── Tests ─────────────────────────────────────────────────────────────────
+  test:
+    desc: "Запускает юнит-тесты для всех модулей"
+    cmds:
+      - platforms: [linux, darwin]
+        cmd: |
+          ERR=0
+          for mod in {{.MODULES}}; do
+            if [ -d "$mod" ]; then
+              echo "Testing $mod"
+              go test -v "./$mod/..." || ERR=1
+            fi
+          done
+          exit $ERR
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -File scripts/test.ps1 -Modules "{{.MODULES}}"
+
+  test-coverage:
+    desc: "Тесты с покрытием (service/repository), отчёт по каждому модулю + общий"
+    cmds:
+      - platforms: [linux, darwin]
+        cmd: |
+          rm -rf {{.COVERAGE_DIR}} && mkdir -p {{.COVERAGE_DIR}}
+          ERR=0
+          for mod in {{.MODULES}}; do
+            TARGET_PKGS=$(go list "./$mod/..." \
+              | grep -E '/(internal/(service|repository))' \
+              | grep -vE '/(mocks|testdata|pkg|api|proto|pb|cmd)' \
+              | paste -sd "," -)
+            if [ -z "$TARGET_PKGS" ]; then continue; fi
+            go test -coverpkg="$TARGET_PKGS" \
+              -coverprofile={{.COVERAGE_DIR}}/$mod.out \
+              -covermode=atomic \
+              $(echo "$TARGET_PKGS" | tr "," " ") || ERR=1
+          done
+          if [ $ERR -ne 0 ]; then exit $ERR; fi
+          for mod in {{.MODULES}}; do
+            OUTFILE="{{.COVERAGE_DIR}}/$mod.out"
+            [ -f "$OUTFILE" ] && { printf " * %s: " "$mod"; go tool cover -func="$OUTFILE" | tail -n1; }
+          done
+          { echo "mode: atomic"; find {{.COVERAGE_DIR}} -type f -name '*.out' ! -name '{{.COVERAGE_FILE}}' -exec grep -h -v "^mode:" {} +; } > {{.COVERAGE_DIR}}/{{.COVERAGE_FILE}}
+          go tool cover -func={{.COVERAGE_DIR}}/{{.COVERAGE_FILE}} | tail -n1
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -File scripts/test-coverage.ps1 -Modules "{{.MODULES}}" -CoverageDir "{{.COVERAGE_DIR}}" -CoverageFile "{{.COVERAGE_FILE}}"
+
+  coverage:html:
+    desc: "Генерирует HTML-отчёт покрытия и открывает в браузере"
+    deps: [ test-coverage ]
+    cmds:
+      - platforms: [linux, darwin]
+        cmd: |
+          OUTPUT={{.COVERAGE_DIR}}/coverage.html
+          go tool cover -html={{.COVERAGE_DIR}}/{{.COVERAGE_FILE}} -o $OUTPUT
+          if command -v open &> /dev/null; then open $OUTPUT; elif command -v xdg-open &> /dev/null; then xdg-open $OUTPUT; fi
+      - platforms: [windows]
+        cmd: powershell -NoProfile -NonInteractive -Command "$out = '{{.COVERAGE_DIR}}/coverage.html'; go tool cover -html='{{.COVERAGE_DIR}}/{{.COVERAGE_FILE}}' -o $out; Start-Process $out"
