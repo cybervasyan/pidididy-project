@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (r *repository) GetOrderByUuid(_ context.Context, orderUUID uuid.UUID) (model.Order, error) {
+func (r *repository) Get(_ context.Context, orderUUID uuid.UUID) (model.Order, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

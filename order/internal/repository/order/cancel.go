@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (r *repository) CancelOrder(_ context.Context, orderUUID uuid.UUID) error {
+func (r *repository) Cancel(_ context.Context, orderUUID uuid.UUID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

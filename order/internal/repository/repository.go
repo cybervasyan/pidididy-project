@@ -7,9 +7,9 @@ import (
 	"github.com/google/uuid"
 )
 
-type Order interface {
-	CreateOrder(ctx context.Context, req *model.Order) error
-	CancelOrder(_ context.Context, orderUUID uuid.UUID) error
+type Repository interface {
+	Create(ctx context.Context, req *model.Order) error
+	Cancel(_ context.Context, orderUUID uuid.UUID) error
 	Update(ctx context.Context, req *model.Order) (model.Order, error)
-	GetOrderByUuid(_ context.Context, orderUUID uuid.UUID) (model.Order, error)
+	Get(_ context.Context, orderUUID uuid.UUID) (model.Order, error)
 }

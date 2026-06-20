@@ -6,7 +6,7 @@ import (
 	"github.com/cybervasyan/pdididy-project/order/internal/repository/model"
 )
 
-func (r *repository) CreateOrder(ctx context.Context, req *model.Order) error {
+func (r *repository) Create(ctx context.Context, req *model.Order) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
