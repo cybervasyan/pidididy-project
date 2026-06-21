@@ -6,7 +6,7 @@ import (
 	"github.com/cybervasyan/pdididy-project/order/internal/repository/model"
 )
 
-func (r *repository) Update(ctx context.Context, req *model.Order) (model.Order, error) {
+func (r *repository) Update(_ context.Context, req *model.Order) (model.Order, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -15,6 +15,7 @@ func (r *repository) Update(ctx context.Context, req *model.Order) (model.Order,
 		return model.Order{}, model.ErrOrderDoesntExist
 	}
 
-	r.orders[req.OrderUUID] = req
-	return *req, nil
+	updated := *req
+	r.orders[req.OrderUUID] = &updated
+	return updated, nil
 }

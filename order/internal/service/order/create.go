@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/cybervasyan/pdididy-project/order/internal/model"
-	"github.com/cybervasyan/pdididy-project/order/internal/repository/converter"
+	repoConverter "github.com/cybervasyan/pdididy-project/order/internal/repository/converter"
 	inventoryv1 "github.com/cybervasyan/pdididy-project/shared/pkg/proto/inventory/v1"
 	"github.com/google/uuid"
 )
@@ -41,12 +41,12 @@ func (s *service) CreateOrder(ctx context.Context, req *model.Order) (model.Orde
 	newOrder.TotalPrice = totalPrice
 	newOrder.Status = model.OrderStatusPENDINGPAYMENT
 
-	repoModel := converter.ToRepoModel(newOrder)
+	repoModel := repoConverter.ToRepoModel(newOrder)
 
 	err = s.orderRepo.Create(ctx, &repoModel)
 	if err != nil {
 		return model.Order{}, err
 	}
 
-	return converter.ToServiceModel(repoModel), nil
+	return repoConverter.ToServiceModel(repoModel), nil
 }
