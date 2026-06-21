@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/cybervasyan/pdididy-project/order/internal/model"
-	"github.com/cybervasyan/pdididy-project/order/internal/repository/converter"
+	repoConverter "github.com/cybervasyan/pdididy-project/order/internal/repository/converter"
 	repoModel "github.com/cybervasyan/pdididy-project/order/internal/repository/model"
 	"github.com/google/uuid"
 )
@@ -19,5 +19,5 @@ func (s *service) GetOrderByUuid(ctx context.Context, orderUUID uuid.UUID) (mode
 		return model.Order{}, err
 	}
 
-	return converter.ToServiceModel(order), nil
+	return repoConverter.ToServiceModel(order), nil
 }
