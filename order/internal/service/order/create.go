@@ -36,9 +36,12 @@ func (s *service) CreateOrder(ctx context.Context, req *model.Order) (model.Orde
 		totalPrice += part.Price
 	}
 
-	repoModel := converter.ToRepoModel(*req)
-	repoModel.OrderUUID = uuid.New()
-	repoModel.TotalPrice = totalPrice
+	newOrder := *req
+	newOrder.OrderUUID = uuid.New()
+	newOrder.TotalPrice = totalPrice
+	newOrder.Status = model.OrderStatusPENDINGPAYMENT
+
+	repoModel := converter.ToRepoModel(newOrder)
 
 	err = s.orderRepo.Create(ctx, &repoModel)
 	if err != nil {
