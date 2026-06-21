@@ -2,10 +2,12 @@ package order
 
 import (
 	"context"
+	"errors"
 
 	grpcConverter "github.com/cybervasyan/pdididy-project/order/internal/client/converter"
 	"github.com/cybervasyan/pdididy-project/order/internal/model"
 	repoConverter "github.com/cybervasyan/pdididy-project/order/internal/repository/converter"
+	repoModel "github.com/cybervasyan/pdididy-project/order/internal/repository/model"
 	paymentv1 "github.com/cybervasyan/pdididy-project/shared/pkg/proto/payment/v1"
 	"github.com/google/uuid"
 )
@@ -13,6 +15,9 @@ import (
 func (s *service) PayOrder(ctx context.Context, req *model.Order) (model.Order, error) {
 	order, err := s.orderRepo.Get(ctx, req.OrderUUID)
 	if err != nil {
+		if errors.Is(err, repoModel.ErrOrderDoesntExist) {
+			return model.Order{}, model.ErrOrderDoesntExist
+		}
 		return model.Order{}, err
 	}
 

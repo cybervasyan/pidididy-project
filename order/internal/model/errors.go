@@ -3,7 +3,7 @@ package model
 import "errors"
 
 var (
-	ErrOrderNotInPending = errors.New("Заказ не в статусе PENDING_PAYMENT")
-	ErrPartNotFound      = errors.New("Такой запчасти не существует")
-	ErrOrderDoesntExist  = errors.New("Такого заказа не существует")
+	ErrOrderNotInPending = errors.New("заказ не в статусе PENDING_PAYMENT")
+	ErrPartNotFound      = errors.New("такой запчасти не существует")
+	ErrOrderDoesntExist  = errors.New("такого заказа не существует")
 )

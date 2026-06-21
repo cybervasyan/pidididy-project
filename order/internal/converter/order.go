@@ -40,8 +40,23 @@ func ModelToCreateResponse(order model.Order) *orderv1.CreateOrderResponse {
 	}
 }
 
+func PaymentMethodToModel(method orderv1.PaymentMethod) model.PaymentMethod {
+	switch method {
+	case orderv1.PaymentMethodCARD:
+		return model.PaymentMethodCARD
+	case orderv1.PaymentMethodSBP:
+		return model.PaymentMethodSBP
+	case orderv1.PaymentMethodCREDITCARD:
+		return model.PaymentMethodCREDITCARD
+	case orderv1.PaymentMethodINVESTORMONEY:
+		return model.PaymentMethodINVESTORMONEY
+	default:
+		return model.PaymentMethodUNKNOWN
+	}
+}
+
 func PayRequestToModel(orderUUID uuid.UUID, req *orderv1.PayOrderRequest) model.Order {
-	pm := model.PaymentMethod(req.PaymentMethod)
+	pm := PaymentMethodToModel(req.PaymentMethod)
 	return model.Order{
 		OrderUUID:     orderUUID,
 		PaymentMethod: &pm,

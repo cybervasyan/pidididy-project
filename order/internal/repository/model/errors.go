@@ -2,4 +2,4 @@ package model
 
 import "errors"
 
-var ErrOrderDoesntExist = errors.New("Такого заказа не существует")
+var ErrOrderDoesntExist = errors.New("такого заказа не существует")

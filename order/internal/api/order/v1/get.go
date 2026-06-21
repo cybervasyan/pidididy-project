@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/http"
 
 	"github.com/cybervasyan/pdididy-project/order/internal/converter"
 	"github.com/cybervasyan/pdididy-project/order/internal/model"
@@ -16,14 +17,14 @@ func (a *api) GetOrderByUuid(ctx context.Context, params orderv1.GetOrderByUuidP
 		switch {
 		case errors.Is(err, model.ErrOrderDoesntExist):
 			return &orderv1.NotFoundError{
-				Code:    404,
-				Message: err.Error(),
+				Code:    http.StatusNotFound,
+				Message: "Заказ не найден",
 			}, nil
 		default:
 			log.Printf("GetOrderByUuid: непредвиденная ошибка для заказа %s: %v", params.OrderUUID, err)
 			return &orderv1.InternalServerError{
-				Code:    500,
-				Message: err.Error(),
+				Code:    http.StatusInternalServerError,
+				Message: "Что-то пошло не так",
 			}, nil
 		}
 	}

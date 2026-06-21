@@ -2,12 +2,12 @@ package v1
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 
 	"github.com/cybervasyan/pdididy-project/order/internal/model"
 	orderv1 "github.com/cybervasyan/pdididy-project/shared/pkg/openapi/order/v1"
-	"github.com/go-faster/errors"
 )
 
 func (a *api) CancelOrder(ctx context.Context, params orderv1.CancelOrderParams) (r orderv1.CancelOrderRes, _ error) {
