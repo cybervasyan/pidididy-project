@@ -15,8 +15,13 @@ type repository struct {
 	parts map[uuid.UUID]model.Part
 }
 
-func NewRepository() *repository {
+func NewRepository(parts []model.Part) *repository {
+	m := make(map[uuid.UUID]model.Part, len(parts))
+	for _, p := range parts {
+		m[p.PartUUID] = p
+	}
+
 	return &repository{
-		parts: make(map[uuid.UUID]model.Part),
+		parts: m,
 	}
 }
