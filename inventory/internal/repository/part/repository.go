@@ -1,0 +1,22 @@
+package part
+
+import (
+	"sync"
+
+	def "github.com/cybervasyan/pdididy-project/inventory/internal/repository"
+	"github.com/cybervasyan/pdididy-project/inventory/internal/repository/model"
+	"github.com/google/uuid"
+)
+
+var _ def.Repository = (*repository)(nil)
+
+type repository struct {
+	mu    sync.RWMutex
+	parts map[uuid.UUID]model.Part
+}
+
+func NewRepository() *repository {
+	return &repository{
+		parts: make(map[uuid.UUID]model.Part),
+	}
+}
