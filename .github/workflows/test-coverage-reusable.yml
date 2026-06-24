@@ -26,18 +26,18 @@ jobs:
       COVERAGE_FILE: total.out
 
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4.2.2
 
-      - name: 🧰 Set up Go
+      - name: Set up Go
         uses: actions/setup-go@v5.4.0
         with:
           go-version: ${{ inputs.go-version }}
 
-      - name: 📌 Install Task
+      - name: Install Task
         uses: arduino/setup-task@v2.0.0
 
-      - name: 🧪 Run tests with coverage
+      - name: Run tests with coverage
         env:
           MODULES: ${{ inputs.modules }}
         run: task test-coverage
@@ -54,7 +54,7 @@ jobs:
 
           # Извлекаем последний элемент строки - это будет процент
           TOTAL=$(echo "$CLEAN_OUTPUT" | awk '{print $NF}')
-          echo "💯 Total coverage: $TOTAL"
+          echo "Total coverage: $TOTAL"
 
           # Сохраняем в переменные окружения
           echo "TOTAL_COVERAGE=$TOTAL" >> $GITHUB_ENV
