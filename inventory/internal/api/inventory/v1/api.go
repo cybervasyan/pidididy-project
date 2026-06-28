@@ -5,6 +5,8 @@ import (
 	inventoryv1 "github.com/cybervasyan/pdididy-project/shared/pkg/proto/inventory/v1"
 )
 
+var _ inventoryv1.InventoryServiceServer = (*api)(nil)
+
 type api struct {
 	inventoryv1.UnimplementedInventoryServiceServer
 
