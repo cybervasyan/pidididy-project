@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net"
@@ -9,21 +8,12 @@ import (
 	"os/signal"
 	"syscall"
 
+	paymentV1 "github.com/cybervasyan/pdididy-project/payment/internal/api/payment/v1"
+	servPayment "github.com/cybervasyan/pdididy-project/payment/internal/service/payment"
 	paymentv1 "github.com/cybervasyan/pdididy-project/shared/pkg/proto/payment/v1"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
-
-type paymentService struct {
-	paymentv1.UnimplementedPaymentServiceServer
-}
-
-func (p *paymentService) PayOrder(context.Context, *paymentv1.PayOrderRequest) (*paymentv1.PayOrderResponse, error) {
-	return &paymentv1.PayOrderResponse{
-		TransactionUuid: uuid.New().String(),
-	}, nil
-}
 
 func main() {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 50052))
@@ -37,15 +27,13 @@ func main() {
 		}
 	}()
 
-	// Создаем gRPC сервер
 	s := grpc.NewServer()
 
-	// Регистрируем наш сервис
-	service := &paymentService{}
+	service := servPayment.NewPaymentService()
+	payAPI := paymentV1.NewAPI(service)
 
-	paymentv1.RegisterPaymentServiceServer(s, service)
+	paymentv1.RegisterPaymentServiceServer(s, payAPI)
 
-	// Включаем рефлексию для отладки
 	reflection.Register(s)
 
 	go func() {
@@ -57,7 +45,6 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
