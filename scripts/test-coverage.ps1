@@ -43,14 +43,18 @@ foreach ($mod in $Modules -split ' ') {
 
 Write-Host "`nMerging coverage files..."
 $totalFile = "$CoverageDir/$CoverageFile"
-"mode: atomic" | Set-Content -Encoding utf8 $totalFile
+# ВАЖНО (Windows PowerShell 5.1): Set-Content/Out-File -Encoding utf8 добавляет BOM,
+# из-за которого `go tool cover` падает с "bad mode line". Пишем UTF-8 без BOM через .NET.
+$lines = [System.Collections.Generic.List[string]]::new()
+$lines.Add("mode: atomic")
 Get-ChildItem -Path $CoverageDir -Filter "*.out" |
     Where-Object { $_.Name -ne $CoverageFile } |
     ForEach-Object {
         Get-Content $_.FullName |
             Where-Object { $_ -notmatch "^mode:" } |
-            Add-Content -Encoding utf8 $totalFile
+            ForEach-Object { $lines.Add($_) }
     }
+[System.IO.File]::WriteAllLines($totalFile, $lines)
 
 Write-Host "`nTotal coverage:"
 go tool cover "-func=$totalFile" | Select-Object -Last 1

@@ -30,3 +30,22 @@ jobs:
       modules: ${{ needs.extract-vars.outputs.modules }}
       go-version: ${{ needs.extract-vars.outputs.go-version }}
       golangci-lint-version: ${{ needs.extract-vars.outputs.golangci-lint-version }}
+
+  test:
+    needs: [extract-vars, lint]
+    uses: ./.github/workflows/test-reusable.yml
+    with:
+      modules: ${{ needs.extract-vars.outputs.modules }}
+      go-version: ${{ needs.extract-vars.outputs.go-version }}
+
+  coverage:
+    # Бейдж обновляем только при push в основную ветку (у тебя это master, не main!)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [extract-vars, test]
+    uses: ./.github/workflows/test-coverage-reusable.yml
+    with:
+      modules: ${{ needs.extract-vars.outputs.modules }}
+      go-version: ${{ needs.extract-vars.outputs.go-version }}
+      gist-id: "306a19789ba8f9e0a31d70798f61758b"
+    secrets:
+      GIST_SECRET: ${{ secrets.GIST_SECRET }}
